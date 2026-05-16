@@ -237,10 +237,10 @@
 <div class="tab-bar">
   <button class="tab active" data-bu="MXNCG">MXNCG 전체</button>
   <button class="tab" data-bu="PMU">PMU</button>
-  <button class="tab" data-bu="OMOBMP">OMOBMP JP</button>
-  <button class="tab" data-bu="CO2O-Italy">CO2O Italy</button>
-  <button class="tab" data-bu="CO2O-US">CO2O US</button>
-  <button class="tab" data-bu="IPTV">IPTV KR</button>
+  <button class="tab" data-bu="OMOBMP">CO2O X OMOBMP with IPTV JP</button>
+  <button class="tab" data-bu="CO2O-Italy">CO2O X OMOBMP with IPTV Italy</button>
+  <button class="tab" data-bu="CO2O-US">CO2O X OMOBMP with IPTV US</button>
+  <button class="tab" data-bu="IPTV">CO2O X OMOBMP with IPTV KR</button>
 </div>
 
 <!-- BU Banner -->
@@ -336,10 +336,10 @@ const months = ['1월', '2월', '3월'];
 const buMeta = {
   'MXNCG':      { name: 'MXNCG 전체',  region: '연결', color: '#3b82f6', desc: '전 사업부 통합 (내부조정 반영)' },
   'PMU':        { name: 'PMU',         region: 'KR/US', color: '#60a5fa', desc: 'Platform Management Unit (KR/US/GB2Bi)' },
-  'OMOBMP':     { name: 'OMOBMP JP',   region: '',     color: '#34d399', desc: '1toN, Connect TK, OMO, S&OP TK' },
-  'CO2O-Italy': { name: 'CO2O Italy',  region: '',     color: '#fbbf24', desc: 'Channel-to-Operations Italy (Connect, Publish, S&OP ML)' },
-  'CO2O-US':    { name: 'CO2O US',     region: '',     color: '#f87171', desc: 'Channel-to-Operations USA (Connect, Blancsom, Publish, S&OP NY)' },
-  'IPTV':       { name: 'IPTV KR',     region: '',     color: '#a78bfa', desc: 'F.BP, F.System, OF, KR ICN' }
+  'OMOBMP':     { name: 'CO2O X OMOBMP with IPTV JP',     region: '', color: '#34d399', desc: '1toN, Connect TK, OMO, S&OP TK' },
+  'CO2O-Italy': { name: 'CO2O X OMOBMP with IPTV Italy', region: '', color: '#fbbf24', desc: 'Channel-to-Operations Italy (Connect, Publish, S&OP ML)' },
+  'CO2O-US':    { name: 'CO2O X OMOBMP with IPTV US',    region: '', color: '#f87171', desc: 'Channel-to-Operations USA (Connect, Blancsom, Publish, S&OP NY)' },
+  'IPTV':       { name: 'CO2O X OMOBMP with IPTV KR',    region: '', color: '#a78bfa', desc: 'F.BP, F.System, OF, KR ICN' }
 };
 
 // All data sourced from 요약(T1)~요약(T5) and 요약(Total)
