@@ -224,45 +224,6 @@
   }
   .bu-banner h2 { font-size: 18px; font-weight: 700; }
   .bu-banner .desc { font-size: 12px; color: var(--text-dim); }
-
-  /* NEV Section */
-  .nev-section { margin-bottom: 14px; }
-  .nev-kpi-row {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
-    gap: 10px;
-    margin-bottom: 14px;
-  }
-  .nev-kpi {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    border-radius: 10px;
-    padding: 12px 14px;
-  }
-  .nev-kpi .nk-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
-  .nev-kpi .nk-val  { font-size: 20px; font-weight: 700; }
-  .nev-kpi .nk-sub  { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
-  .nev-charts {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-  @media (max-width: 640px) { .nev-charts { grid-template-columns: 1fr; } }
-  .nev-table-wrap { overflow-x: auto; }
-  .nev-table { width: 100%; border-collapse: collapse; font-size: 12px; }
-  .nev-table th, .nev-table td {
-    padding: 7px 10px;
-    border-bottom: 1px solid var(--border);
-    text-align: right;
-    white-space: nowrap;
-  }
-  .nev-table th { color: var(--text-dim); font-weight: 600; font-size: 11px; background: var(--panel-2); }
-  .nev-table td:first-child, .nev-table th:first-child { text-align: left; }
-  .nev-table .avp-pos { color: var(--green); font-weight: 600; }
-  .nev-table .avp-neg { color: var(--red); font-weight: 600; }
-  .nev-table .plan-val { color: var(--text-dim); }
-  .nev-table tr.total-row td { font-weight: 700; background: rgba(59,130,246,0.08); }
 </style>
 </head>
 <body>
@@ -323,33 +284,6 @@
   <div class="card">
     <h2>Fixed Exp.</h2>
     <div class="chart-wrap short"><canvas id="fixedChart"></canvas></div>
-  </div>
-</div>
-
-<!-- NEV 누적 추이 Section -->
-<div id="nevSection" class="nev-section">
-  <div class="section-title">NEV 누적 추이 — Sales &amp; OV (E vs P · 2026 Q1)</div>
-  <!-- KPI row -->
-  <div class="nev-kpi-row" id="nevKpiRow"></div>
-  <!-- Cumulative Charts -->
-  <div class="nev-charts">
-    <div class="card">
-      <h2>📈 Sales 누적 Trend — E vs P</h2>
-      <div class="chart-wrap"><canvas id="nevSalesChart"></canvas></div>
-    </div>
-    <div class="card">
-      <h2>📊 OV 누적 Trend — E vs P</h2>
-      <div class="chart-wrap"><canvas id="nevOvChart"></canvas></div>
-    </div>
-  </div>
-  <!-- Monthly detail table -->
-  <div class="card" style="margin-bottom:14px;">
-    <div class="nev-table-wrap">
-      <table class="nev-table">
-        <thead id="nevTableHead"></thead>
-        <tbody id="nevTableBody"></tbody>
-      </table>
-    </div>
   </div>
 </div>
 
@@ -744,148 +678,11 @@ function renderDetailTable(bu) {
   });
 }
 
-// ============ NEV 누적 추이 ============
-function renderNEVSection(bu) {
-  const data = buMetricsData[bu];
-  const color = buMeta[bu].color;
-
-  // Compute cumulative arrays
-  function cumulative(arr) {
-    let s = 0;
-    return arr.map(v => { s += v; return s; });
-  }
-  const salesActCum = cumulative(data.Sales.actual);
-  const salesPlnCum = cumulative(data.Sales.plan);
-  const ovActCum    = cumulative(data.OV.actual);
-  const ovPlnCum    = cumulative(data.OV.plan);
-
-  const cumLabels = ['1월 누적', '2월 누적', '3월 누적'];
-
-  // KPI Row
-  const nevKpiRow = document.getElementById('nevKpiRow');
-  nevKpiRow.innerHTML = '';
-  const q1SalesAct = salesActCum[2], q1SalesPln = salesPlnCum[2];
-  const q1OvAct    = ovActCum[2],   q1OvPln    = ovPlnCum[2];
-  const salesAvp   = q1SalesPln !== 0 ? (q1SalesAct / q1SalesPln * 100) : null;
-  const ovAvp      = q1OvPln    !== 0 ? (q1OvAct    / q1OvPln    * 100) : null;
-
-  const kpiItems = [
-    { label: 'Q1 Sales 실적 (E)', val: fmtUSD(q1SalesAct), sub: `계획 ${fmtUSD(q1SalesPln)}`, avp: salesAvp, cost: false },
-    { label: 'Q1 Sales AvP',      val: salesAvp != null ? salesAvp.toFixed(1) + '%' : '—', sub: salesAvp != null ? (salesAvp >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: salesAvp, cost: false },
-    { label: 'Q1 OV 실적 (E)',    val: fmtUSD(q1OvAct),   sub: `계획 ${fmtUSD(q1OvPln)}`, avp: ovAvp, cost: false },
-    { label: 'Q1 OV AvP',         val: ovAvp   != null ? ovAvp.toFixed(1)   + '%' : '—', sub: ovAvp != null ? (ovAvp >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: ovAvp, cost: false },
-  ];
-  kpiItems.forEach(item => {
-    const isPos = item.avp != null ? (item.avp >= 100) : true;
-    const div = document.createElement('div');
-    div.className = 'nev-kpi';
-    div.innerHTML = `
-      <div class="nk-label">${item.label}</div>
-      <div class="nk-val ${item.avp != null && !isPos ? 'neg' : ''}" style="color:${item.avp != null ? (isPos ? 'var(--green)' : 'var(--red)') : 'var(--text)'}">${item.val}</div>
-      <div class="nk-sub">${item.sub}</div>
-    `;
-    nevKpiRow.appendChild(div);
-  });
-
-  // Cumulative charts
-  function renderCumChart(canvasId, actCum, plnCum, col, title) {
-    if (charts[canvasId]) charts[canvasId].destroy();
-    const ctx = document.getElementById(canvasId).getContext('2d');
-    charts[canvasId] = new Chart(ctx, {
-      type: 'bar',
-      data: {
-        labels: cumLabels,
-        datasets: [
-          { label: '계획 (P)', data: plnCum, backgroundColor: 'rgba(148,163,184,0.5)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4 },
-          { label: '실적 (E)', data: actCum, backgroundColor: col + 'CC', borderColor: col, borderWidth: 1, borderRadius: 4 }
-        ]
-      },
-      options: {
-        responsive: true,
-        maintainAspectRatio: false,
-        plugins: {
-          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 }, padding: 6 } },
-          tooltip: {
-            callbacks: {
-              label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y),
-              afterBody: (items) => {
-                if (items.length === 2) {
-                  const e = items.find(i => i.dataset.label === '실적 (E)');
-                  const p = items.find(i => i.dataset.label === '계획 (P)');
-                  if (e && p && p.parsed.y !== 0) {
-                    const avp = (e.parsed.y / p.parsed.y * 100).toFixed(1);
-                    const diff = e.parsed.y - p.parsed.y;
-                    return ['AvP: ' + avp + '%', '차이: ' + (diff >= 0 ? '+' : '') + fmtUSD(diff)];
-                  }
-                }
-                return [];
-              }
-            }
-          }
-        },
-        scales: {
-          y: { ticks: { callback: v => fmtUSDk(v), font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
-          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
-        }
-      }
-    });
-  }
-  renderCumChart('nevSalesChart', salesActCum, salesPlnCum, color);
-  renderCumChart('nevOvChart', ovActCum, ovPlnCum, '#ef4444');
-
-  // Monthly detail table
-  const thead = document.getElementById('nevTableHead');
-  const tbody = document.getElementById('nevTableBody');
-  thead.innerHTML = `
-    <tr>
-      <th rowspan="2">지표</th>
-      <th colspan="3">1월</th>
-      <th colspan="3">2월</th>
-      <th colspan="3">3월</th>
-      <th colspan="3">Q1 누적</th>
-    </tr>
-    <tr>
-      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
-      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
-      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
-      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
-    </tr>`;
-
-  const nevRows = [
-    { name: 'Sales', m: data.Sales, cost: false, color: color },
-    { name: 'GP',    m: data.GP,    cost: false, color: '#22c55e' },
-    { name: 'CM',    m: data.CM,    cost: false, color: '#a78bfa' },
-    { name: 'OV',    m: data.OV,    cost: false, color: '#ef4444' },
-  ];
-  tbody.innerHTML = '';
-  nevRows.forEach(row => {
-    const qtdAct = sumQ1(row.m.actual), qtdPln = sumQ1(row.m.plan);
-    const avpQ1  = qtdPln !== 0 ? (qtdAct / qtdPln * 100) : null;
-    const tr = document.createElement('tr');
-    let html = `<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${row.color};margin-right:6px;"></span>${row.name}</td>`;
-    for (let i = 0; i < 3; i++) {
-      const a = row.m.actual[i], p = row.m.plan[i];
-      const avp = p !== 0 ? (a / p * 100) : null;
-      const cls = avp != null ? (avp >= 100 ? 'avp-pos' : 'avp-neg') : '';
-      html += `<td class="${a < 0 ? 'neg' : ''}">${fmtUSD(a)}</td>`;
-      html += `<td class="plan-val">${fmtUSD(p)}</td>`;
-      html += `<td class="${cls}">${avp != null ? avp.toFixed(1) + '%' : '—'}</td>`;
-    }
-    const cls = avpQ1 != null ? (avpQ1 >= 100 ? 'avp-pos' : 'avp-neg') : '';
-    html += `<td class="${qtdAct < 0 ? 'neg' : ''}">${fmtUSD(qtdAct)}</td>`;
-    html += `<td class="plan-val">${fmtUSD(qtdPln)}</td>`;
-    html += `<td class="${cls}">${avpQ1 != null ? avpQ1.toFixed(1) + '%' : '—'}</td>`;
-    tr.innerHTML = html;
-    tbody.appendChild(tr);
-  });
-}
-
 // ============ Master Render ============
 function renderAll() {
   renderBanner(currentBu);
   renderKPIs(currentBu, currentPeriod);
   renderTrends(currentBu, currentPeriod);
-  renderNEVSection(currentBu);
   renderSubChannels(currentBu);
   renderDetailTable(currentBu);
 }
