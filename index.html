@@ -696,9 +696,9 @@ function renderDetailTable(bu) {
 
 // ============ Master Render ============
 // ============ MXNCG Sales & OV Combined Trend ============
-function renderMXNCGTrend(bu) {
+function renderMXNCGTrend(bu, period) {
   const section = document.getElementById('mxncgTrendSection');
-  if (bu !== 'MXNCG') { section.style.display = 'none'; return; }
+  if (bu !== 'MXNCG' || period !== 'all') { section.style.display = 'none'; return; }
   section.style.display = 'block';
 
   const data = buMetricsData['MXNCG'];
@@ -763,7 +763,7 @@ function renderAll() {
   renderBanner(currentBu);
   renderKPIs(currentBu, currentPeriod);
   renderTrends(currentBu, currentPeriod);
-  renderMXNCGTrend(currentBu);
+  renderMXNCGTrend(currentBu, currentPeriod);
   renderSubChannels(currentBu);
   renderDetailTable(currentBu);
 }
