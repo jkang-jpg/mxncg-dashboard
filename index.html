@@ -287,6 +287,22 @@
   </div>
 </div>
 
+
+<!-- MXNCG 전체 Sales & OV Combined Trend -->
+<div id="mxncgTrendSection" style="display:none;">
+  <div class="section-title">2026년 1~3월 Sales &amp; OV Trend — E(실적) vs P(계획)</div>
+  <div class="grid-2">
+    <div class="card">
+      <h2>📊 Sales Trend — E vs P</h2>
+      <div class="chart-wrap"><canvas id="mxncgSalesChart"></canvas></div>
+    </div>
+    <div class="card">
+      <h2>📊 OV Trend — E vs P</h2>
+      <div class="chart-wrap"><canvas id="mxncgOvChart"></canvas></div>
+    </div>
+  </div>
+</div>
+
 <!-- Sub-channel breakdown (only shown for BUs with sub-data) -->
 <div id="subChannelSection" style="display:none;">
   <div class="section-title">서브 채널 분석 <span class="sub" id="subChannelSubtitle" style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:8px;"></span></div>
@@ -679,10 +695,75 @@ function renderDetailTable(bu) {
 }
 
 // ============ Master Render ============
+// ============ MXNCG Sales & OV Combined Trend ============
+function renderMXNCGTrend(bu) {
+  const section = document.getElementById('mxncgTrendSection');
+  if (bu !== 'MXNCG') { section.style.display = 'none'; return; }
+  section.style.display = 'block';
+
+  const data = buMetricsData['MXNCG'];
+  const labels = ['1월', '2월', '3월'];
+
+  function linReg(ys) {
+    const n = ys.length;
+    const xs = ys.map((_, i) => i + 1);
+    const mx = (n + 1) / 2;
+    const my = ys.reduce((a, b) => a + b, 0) / n;
+    const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
+    const den = xs.reduce((s, x) => s + Math.pow(x - mx, 2), 0);
+    const slope = num / den;
+    const intercept = my - slope * mx;
+    return xs.map(x => intercept + slope * x);
+  }
+
+  function renderCombo(canvasId, actual, plan, color) {
+    if (charts[canvasId]) charts[canvasId].destroy();
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    const trend = linReg(actual);
+    charts[canvasId] = new Chart(ctx, {
+      data: {
+        labels,
+        datasets: [
+          { type: 'bar',  label: 'P 계획',   data: plan,   backgroundColor: 'rgba(148,163,184,0.45)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4, order: 4 },
+          { type: 'bar',  label: 'E 실적',   data: actual, backgroundColor: color + 'BB',             borderColor: color,    borderWidth: 1, borderRadius: 4, order: 3 },
+          { type: 'line', label: 'E 실적선', data: actual, borderColor: color, borderWidth: 2, borderDash: [6,4], pointRadius: 5, pointBackgroundColor: color, tension: 0, fill: false, order: 1 },
+          { type: 'line', label: 'E 추세선', data: trend,  borderColor: color, borderWidth: 2, borderDash: [],    pointRadius: 0,                              tension: 0, fill: false, order: 0 }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 }, padding: 8,
+            generateLabels: (chart) => chart.data.datasets.map((ds, i) => ({
+              text: ds.label,
+              fillStyle: ds.type === 'bar' ? ds.backgroundColor : 'transparent',
+              strokeStyle: ds.borderColor,
+              lineWidth: 2,
+              lineDash: ds.borderDash || [],
+              datasetIndex: i,
+              hidden: false
+            }))
+          }},
+          tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y) } }
+        },
+        scales: {
+          y: { ticks: { callback: v => fmtUSDk(v), font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          x: { grid: { display: false }, ticks: { font: { size: 12 } } }
+        }
+      }
+    });
+  }
+
+  renderCombo('mxncgSalesChart', data.Sales.actual, data.Sales.plan, '#3b82f6');
+  renderCombo('mxncgOvChart',    data.OV.actual,    data.OV.plan,    '#ef4444');
+}
+
 function renderAll() {
   renderBanner(currentBu);
   renderKPIs(currentBu, currentPeriod);
   renderTrends(currentBu, currentPeriod);
+  renderMXNCGTrend(currentBu);
   renderSubChannels(currentBu);
   renderDetailTable(currentBu);
 }
