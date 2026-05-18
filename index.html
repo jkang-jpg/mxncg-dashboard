@@ -294,15 +294,16 @@
   <div class="grid-2">
     <div class="card">
       <h2>📊 Sales Trend — E vs P</h2>
+      <div id="mxncgSalesSummary" style="font-size:12px;margin-bottom:10px;padding:7px 10px;border-radius:7px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.18);display:flex;flex-wrap:wrap;align-items:center;gap:6px;"></div>
       <div class="chart-wrap"><canvas id="mxncgSalesChart"></canvas></div>
     </div>
     <div class="card">
       <h2>📊 OV Trend — E vs P</h2>
+      <div id="mxncgOvSummary" style="font-size:12px;margin-bottom:10px;padding:7px 10px;border-radius:7px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.18);display:flex;flex-wrap:wrap;align-items:center;gap:6px;"></div>
       <div class="chart-wrap"><canvas id="mxncgOvChart"></canvas></div>
     </div>
   </div>
 </div>
-
 <!-- Sub-channel breakdown (only shown for BUs with sub-data) -->
 <div id="subChannelSection" style="display:none;">
   <div class="section-title">서브 채널 분석 <span class="sub" id="subChannelSubtitle" style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:8px;"></span></div>
@@ -705,18 +706,28 @@ function renderMXNCGTrend(bu, period) {
   const labels = ['1월', '2월', '3월'];
 
   function linReg(ys) {
-    const n = ys.length;
-    const xs = ys.map((_, i) => i + 1);
-    const mx = (n + 1) / 2;
-    const my = ys.reduce((a, b) => a + b, 0) / n;
-    const num = xs.reduce((s, x, i) => s + (x - mx) * (ys[i] - my), 0);
-    const den = xs.reduce((s, x) => s + Math.pow(x - mx, 2), 0);
-    const slope = num / den;
-    const intercept = my - slope * mx;
-    return xs.map(x => intercept + slope * x);
+    const n = ys.length, xs = ys.map((_,i) => i+1), mx = (n+1)/2;
+    const my = ys.reduce((a,b) => a+b,0)/n;
+    const slope = xs.reduce((s,x,i) => s+(x-mx)*(ys[i]-my),0) / xs.reduce((s,x) => s+Math.pow(x-mx,2),0);
+    const ic = my - slope*mx;
+    return xs.map(x => ic + slope*x);
   }
 
-  function renderCombo(canvasId, actual, plan, color) {
+  function renderSummary(id, label, actual, plan, accentColor) {
+    const ytdE = actual.reduce((a,b)=>a+b,0), ytdP = plan.reduce((a,b)=>a+b,0);
+    const diff = ytdE - ytdP;
+    const avp = ytdP !== 0 ? (ytdE/ytdP*100) : null;
+    const pos = diff >= 0;
+    const col = pos ? 'var(--green)' : 'var(--red)';
+    const badge = avp !== null ? `<span style="padding:2px 8px;border-radius:4px;background:${pos?'rgba(34,197,94,0.18)':'rgba(239,68,68,0.18)'};color:${col};font-weight:700;font-size:11px;">AvP ${avp.toFixed(1)}%</span>` : '';
+    document.getElementById(id).innerHTML =
+      `<span style="font-weight:700;color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">${label} Summary</span>
+       <span style="color:var(--text-dim);">YTD P</span><strong>${fmtUSD(ytdP)}</strong>
+       <span style="color:var(--text-dim);margin-left:4px;">YTD E</span><strong style="color:${col};">${fmtUSD(ytdE)}</strong>
+       <strong style="color:${col};">${diff>=0?'+':''}${fmtUSD(diff)}</strong>${badge}`;
+  }
+
+  function renderCombo(canvasId, actual, plan, barColor) {
     if (charts[canvasId]) charts[canvasId].destroy();
     const ctx = document.getElementById(canvasId).getContext('2d');
     const trend = linReg(actual);
@@ -724,32 +735,44 @@ function renderMXNCGTrend(bu, period) {
       data: {
         labels,
         datasets: [
-          { type: 'bar',  label: 'P 계획',   data: plan,   backgroundColor: 'rgba(148,163,184,0.45)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4, order: 4 },
-          { type: 'bar',  label: 'E 실적',   data: actual, backgroundColor: color + 'BB',             borderColor: color,    borderWidth: 1, borderRadius: 4, order: 3 },
-          { type: 'line', label: 'E 실적선', data: actual, borderColor: color, borderWidth: 2, borderDash: [6,4], pointRadius: 5, pointBackgroundColor: color, tension: 0, fill: false, order: 1 },
-          { type: 'line', label: 'E 추세선', data: trend,  borderColor: color, borderWidth: 2, borderDash: [],    pointRadius: 0,                              tension: 0, fill: false, order: 0 }
+          { type:'bar',  label:'■ P 계획',       data:plan,   backgroundColor:'rgba(100,116,139,0.22)', borderColor:'#475569', borderWidth:1.5, borderRadius:6, order:4 },
+          { type:'bar',  label:'■ E 실적',       data:actual, backgroundColor:barColor+'CC',           borderColor:barColor,  borderWidth:1.5, borderRadius:6, order:3 },
+          { type:'line', label:'— E 실적선 (점선)', data:actual, borderColor:'rgba(248,250,252,0.9)', borderWidth:2.5, borderDash:[6,4], pointRadius:5, pointBackgroundColor:barColor, pointBorderColor:'#f8fafc', pointBorderWidth:2, tension:0, fill:false, order:1 },
+          { type:'line', label:'— E 추세선 (실선)', data:trend,  borderColor:'#fbbf24', borderWidth:2.5, borderDash:[], pointRadius:0, tension:0.25, fill:false, order:0 }
         ]
       },
       options: {
-        responsive: true,
-        maintainAspectRatio: false,
+        responsive:true, maintainAspectRatio:false,
         plugins: {
-          legend: { position: 'top', labels: { boxWidth: 12, font: { size: 11 }, padding: 8,
-            generateLabels: (chart) => chart.data.datasets.map((ds, i) => ({
-              text: ds.label,
-              fillStyle: ds.type === 'bar' ? ds.backgroundColor : 'transparent',
-              strokeStyle: ds.borderColor,
-              lineWidth: 2,
-              lineDash: ds.borderDash || [],
-              datasetIndex: i,
-              hidden: false
-            }))
-          }},
-          tooltip: { callbacks: { label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y) } }
+          legend: {
+            position:'top',
+            labels: {
+              font:{size:11}, padding:14, boxWidth:18,
+              generateLabels: () => [
+                { text:'■ P 계획',        fillStyle:'rgba(100,116,139,0.4)', strokeStyle:'#475569', lineWidth:1.5 },
+                { text:'■ E 실적',        fillStyle:barColor+'CC',           strokeStyle:barColor,  lineWidth:1.5 },
+                { text:'— E 실적선 (점선)',fillStyle:'transparent', strokeStyle:'rgba(248,250,252,0.9)', lineWidth:2.5, lineDash:[6,4] },
+                { text:'— E 추세선 (실선)',fillStyle:'transparent', strokeStyle:'#fbbf24',               lineWidth:2.5 }
+              ]
+            }
+          },
+          tooltip: {
+            callbacks: {
+              label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y),
+              afterBody: items => {
+                const e = items.find(i => i.datasetIndex===1), p = items.find(i => i.datasetIndex===0);
+                if (e && p && p.parsed.y!==0) {
+                  const diff=e.parsed.y-p.parsed.y, avp=(e.parsed.y/p.parsed.y*100).toFixed(1);
+                  return ['AvP: '+avp+'%', '차이: '+(diff>=0?'+':'')+fmtUSD(diff)];
+                }
+                return [];
+              }
+            }
+          }
         },
         scales: {
-          y: { ticks: { callback: v => fmtUSDk(v), font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
-          x: { grid: { display: false }, ticks: { font: { size: 12 } } }
+          y: { ticks:{ callback:v=>fmtUSDk(v), font:{size:10}, color:'#94a3b8' }, grid:{ color:'rgba(148,163,184,0.07)' } },
+          x: { grid:{ display:false }, ticks:{ font:{size:12,weight:'600'}, color:'#e2e8f0' } }
         }
       }
     });
@@ -757,6 +780,8 @@ function renderMXNCGTrend(bu, period) {
 
   renderCombo('mxncgSalesChart', data.Sales.actual, data.Sales.plan, '#3b82f6');
   renderCombo('mxncgOvChart',    data.OV.actual,    data.OV.plan,    '#ef4444');
+  renderSummary('mxncgSalesSummary', 'Sales Trend', data.Sales.actual, data.Sales.plan, '#3b82f6');
+  renderSummary('mxncgOvSummary',    'OV Trend',    data.OV.actual,    data.OV.plan,    '#ef4444');
 }
 
 function renderAll() {
