@@ -224,6 +224,45 @@
   }
   .bu-banner h2 { font-size: 18px; font-weight: 700; }
   .bu-banner .desc { font-size: 12px; color: var(--text-dim); }
+
+  /* NEV Section */
+  .nev-section { margin-bottom: 14px; }
+  .nev-kpi-row {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 10px;
+    margin-bottom: 14px;
+  }
+  .nev-kpi {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    padding: 12px 14px;
+  }
+  .nev-kpi .nk-label { font-size: 11px; color: var(--text-dim); margin-bottom: 4px; }
+  .nev-kpi .nk-val  { font-size: 20px; font-weight: 700; }
+  .nev-kpi .nk-sub  { font-size: 11px; color: var(--text-dim); margin-top: 3px; }
+  .nev-charts {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  @media (max-width: 640px) { .nev-charts { grid-template-columns: 1fr; } }
+  .nev-table-wrap { overflow-x: auto; }
+  .nev-table { width: 100%; border-collapse: collapse; font-size: 12px; }
+  .nev-table th, .nev-table td {
+    padding: 7px 10px;
+    border-bottom: 1px solid var(--border);
+    text-align: right;
+    white-space: nowrap;
+  }
+  .nev-table th { color: var(--text-dim); font-weight: 600; font-size: 11px; background: var(--panel-2); }
+  .nev-table td:first-child, .nev-table th:first-child { text-align: left; }
+  .nev-table .avp-pos { color: var(--green); font-weight: 600; }
+  .nev-table .avp-neg { color: var(--red); font-weight: 600; }
+  .nev-table .plan-val { color: var(--text-dim); }
+  .nev-table tr.total-row td { font-weight: 700; background: rgba(59,130,246,0.08); }
 </style>
 </head>
 <body>
@@ -287,23 +326,33 @@
   </div>
 </div>
 
-
-<!-- MXNCG 전체 Sales & OV Combined Trend -->
-<div id="mxncgTrendSection" style="display:none;">
-  <div class="section-title">2026년 1~3월 Sales &amp; OV Trend — E(실적) vs P(계획)</div>
-  <div class="grid-2">
+<!-- NEV 누적 추이 Section -->
+<div id="nevSection" class="nev-section">
+  <div class="section-title">NEV 누적 추이 — Sales &amp; OV (E vs P · 2026 Q1)</div>
+  <!-- KPI row -->
+  <div class="nev-kpi-row" id="nevKpiRow"></div>
+  <!-- Cumulative Charts -->
+  <div class="nev-charts">
     <div class="card">
-      <h2>📊 Sales Trend — E vs P</h2>
-      <div id="mxncgSalesSummary" style="font-size:12px;margin-bottom:10px;padding:7px 10px;border-radius:7px;background:rgba(59,130,246,0.07);border:1px solid rgba(59,130,246,0.18);display:flex;flex-wrap:wrap;align-items:center;gap:6px;"></div>
-      <div class="chart-wrap"><canvas id="mxncgSalesChart"></canvas></div>
+      <h2>📈 Sales 누적 Trend — E vs P</h2>
+      <div class="chart-wrap"><canvas id="nevSalesChart"></canvas></div>
     </div>
     <div class="card">
-      <h2>📊 OV Trend — E vs P</h2>
-      <div id="mxncgOvSummary" style="font-size:12px;margin-bottom:10px;padding:7px 10px;border-radius:7px;background:rgba(239,68,68,0.07);border:1px solid rgba(239,68,68,0.18);display:flex;flex-wrap:wrap;align-items:center;gap:6px;"></div>
-      <div class="chart-wrap"><canvas id="mxncgOvChart"></canvas></div>
+      <h2>📊 OV 누적 Trend — E vs P</h2>
+      <div class="chart-wrap"><canvas id="nevOvChart"></canvas></div>
+    </div>
+  </div>
+  <!-- Monthly detail table -->
+  <div class="card" style="margin-bottom:14px;">
+    <div class="nev-table-wrap">
+      <table class="nev-table">
+        <thead id="nevTableHead"></thead>
+        <tbody id="nevTableBody"></tbody>
+      </table>
     </div>
   </div>
 </div>
+
 <!-- Sub-channel breakdown (only shown for BUs with sub-data) -->
 <div id="subChannelSection" style="display:none;">
   <div class="section-title">서브 채널 분석 <span class="sub" id="subChannelSubtitle" style="font-size:11px;color:var(--text-dim);font-weight:400;margin-left:8px;"></span></div>
@@ -695,75 +744,79 @@ function renderDetailTable(bu) {
   });
 }
 
-// ============ Master Render ============
-// ============ MXNCG Sales & OV Combined Trend ============
-function renderMXNCGTrend(bu, period) {
-  const section = document.getElementById('mxncgTrendSection');
-  if (bu !== 'MXNCG' || period !== 'all') { section.style.display = 'none'; return; }
-  section.style.display = 'block';
+// ============ NEV 누적 추이 ============
+function renderNEVSection(bu) {
+  const data = buMetricsData[bu];
+  const color = buMeta[bu].color;
 
-  const data = buMetricsData['MXNCG'];
-  const labels = ['1월', '2월', '3월'];
-
-  function linReg(ys) {
-    const n = ys.length, xs = ys.map((_,i) => i+1), mx = (n+1)/2;
-    const my = ys.reduce((a,b) => a+b,0)/n;
-    const slope = xs.reduce((s,x,i) => s+(x-mx)*(ys[i]-my),0) / xs.reduce((s,x) => s+Math.pow(x-mx,2),0);
-    const ic = my - slope*mx;
-    return xs.map(x => ic + slope*x);
+  // Compute cumulative arrays
+  function cumulative(arr) {
+    let s = 0;
+    return arr.map(v => { s += v; return s; });
   }
+  const salesActCum = cumulative(data.Sales.actual);
+  const salesPlnCum = cumulative(data.Sales.plan);
+  const ovActCum    = cumulative(data.OV.actual);
+  const ovPlnCum    = cumulative(data.OV.plan);
 
-  function renderSummary(id, label, actual, plan, accentColor) {
-    const ytdE = actual.reduce((a,b)=>a+b,0), ytdP = plan.reduce((a,b)=>a+b,0);
-    const diff = ytdE - ytdP;
-    const avp = ytdP !== 0 ? (ytdE/ytdP*100) : null;
-    const pos = diff >= 0;
-    const col = pos ? 'var(--green)' : 'var(--red)';
-    const badge = avp !== null ? `<span style="padding:2px 8px;border-radius:4px;background:${pos?'rgba(34,197,94,0.18)':'rgba(239,68,68,0.18)'};color:${col};font-weight:700;font-size:11px;">AvP ${avp.toFixed(1)}%</span>` : '';
-    document.getElementById(id).innerHTML =
-      `<span style="font-weight:700;color:var(--text-dim);font-size:11px;text-transform:uppercase;letter-spacing:.5px;">${label} Summary</span>
-       <span style="color:var(--text-dim);">YTD P</span><strong>${fmtUSD(ytdP)}</strong>
-       <span style="color:var(--text-dim);margin-left:4px;">YTD E</span><strong style="color:${col};">${fmtUSD(ytdE)}</strong>
-       <strong style="color:${col};">${diff>=0?'+':''}${fmtUSD(diff)}</strong>${badge}`;
-  }
+  const cumLabels = ['1월 누적', '2월 누적', '3월 누적'];
 
-  function renderCombo(canvasId, actual, plan, barColor) {
+  // KPI Row
+  const nevKpiRow = document.getElementById('nevKpiRow');
+  nevKpiRow.innerHTML = '';
+  const q1SalesAct = salesActCum[2], q1SalesPln = salesPlnCum[2];
+  const q1OvAct    = ovActCum[2],   q1OvPln    = ovPlnCum[2];
+  const salesAvp   = q1SalesPln !== 0 ? (q1SalesAct / q1SalesPln * 100) : null;
+  const ovAvp      = q1OvPln    !== 0 ? (q1OvAct    / q1OvPln    * 100) : null;
+
+  const kpiItems = [
+    { label: 'Q1 Sales 실적 (E)', val: fmtUSD(q1SalesAct), sub: `계획 ${fmtUSD(q1SalesPln)}`, avp: salesAvp, cost: false },
+    { label: 'Q1 Sales AvP',      val: salesAvp != null ? salesAvp.toFixed(1) + '%' : '—', sub: salesAvp != null ? (salesAvp >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: salesAvp, cost: false },
+    { label: 'Q1 OV 실적 (E)',    val: fmtUSD(q1OvAct),   sub: `계획 ${fmtUSD(q1OvPln)}`, avp: ovAvp, cost: false },
+    { label: 'Q1 OV AvP',         val: ovAvp   != null ? ovAvp.toFixed(1)   + '%' : '—', sub: ovAvp != null ? (ovAvp >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: ovAvp, cost: false },
+  ];
+  kpiItems.forEach(item => {
+    const isPos = item.avp != null ? (item.avp >= 100) : true;
+    const div = document.createElement('div');
+    div.className = 'nev-kpi';
+    div.innerHTML = `
+      <div class="nk-label">${item.label}</div>
+      <div class="nk-val ${item.avp != null && !isPos ? 'neg' : ''}" style="color:${item.avp != null ? (isPos ? 'var(--green)' : 'var(--red)') : 'var(--text)'}">${item.val}</div>
+      <div class="nk-sub">${item.sub}</div>
+    `;
+    nevKpiRow.appendChild(div);
+  });
+
+  // Cumulative charts
+  function renderCumChart(canvasId, actCum, plnCum, col, title) {
     if (charts[canvasId]) charts[canvasId].destroy();
     const ctx = document.getElementById(canvasId).getContext('2d');
-    const trend = linReg(actual);
     charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
       data: {
-        labels,
+        labels: cumLabels,
         datasets: [
-          { type:'bar',  label:'■ P 계획',       data:plan,   backgroundColor:'rgba(100,116,139,0.22)', borderColor:'#475569', borderWidth:1.5, borderRadius:6, order:4 },
-          { type:'bar',  label:'■ E 실적',       data:actual, backgroundColor:barColor+'CC',           borderColor:barColor,  borderWidth:1.5, borderRadius:6, order:3 },
-          { type:'line', label:'— E 실적선 (점선)', data:actual, borderColor:'rgba(248,250,252,0.9)', borderWidth:2.5, borderDash:[6,4], pointRadius:5, pointBackgroundColor:barColor, pointBorderColor:'#f8fafc', pointBorderWidth:2, tension:0, fill:false, order:1 },
-          { type:'line', label:'— E 추세선 (실선)', data:trend,  borderColor:'#fbbf24', borderWidth:2.5, borderDash:[], pointRadius:0, tension:0.25, fill:false, order:0 }
+          { label: '계획 (P)', data: plnCum, backgroundColor: 'rgba(148,163,184,0.5)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4 },
+          { label: '실적 (E)', data: actCum, backgroundColor: col + 'CC', borderColor: col, borderWidth: 1, borderRadius: 4 }
         ]
       },
       options: {
-        responsive:true, maintainAspectRatio:false,
+        responsive: true,
+        maintainAspectRatio: false,
         plugins: {
-          legend: {
-            position:'top',
-            labels: {
-              font:{size:11}, padding:14, boxWidth:18,
-              generateLabels: () => [
-                { text:'■ P 계획',        fillStyle:'rgba(100,116,139,0.4)', strokeStyle:'#475569', lineWidth:1.5 },
-                { text:'■ E 실적',        fillStyle:barColor+'CC',           strokeStyle:barColor,  lineWidth:1.5 },
-                { text:'— E 실적선 (점선)',fillStyle:'transparent', strokeStyle:'rgba(248,250,252,0.9)', lineWidth:2.5, lineDash:[6,4] },
-                { text:'— E 추세선 (실선)',fillStyle:'transparent', strokeStyle:'#fbbf24',               lineWidth:2.5 }
-              ]
-            }
-          },
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 }, padding: 6 } },
           tooltip: {
             callbacks: {
               label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y),
-              afterBody: items => {
-                const e = items.find(i => i.datasetIndex===1), p = items.find(i => i.datasetIndex===0);
-                if (e && p && p.parsed.y!==0) {
-                  const diff=e.parsed.y-p.parsed.y, avp=(e.parsed.y/p.parsed.y*100).toFixed(1);
-                  return ['AvP: '+avp+'%', '차이: '+(diff>=0?'+':'')+fmtUSD(diff)];
+              afterBody: (items) => {
+                if (items.length === 2) {
+                  const e = items.find(i => i.dataset.label === '실적 (E)');
+                  const p = items.find(i => i.dataset.label === '계획 (P)');
+                  if (e && p && p.parsed.y !== 0) {
+                    const avp = (e.parsed.y / p.parsed.y * 100).toFixed(1);
+                    const diff = e.parsed.y - p.parsed.y;
+                    return ['AvP: ' + avp + '%', '차이: ' + (diff >= 0 ? '+' : '') + fmtUSD(diff)];
+                  }
                 }
                 return [];
               }
@@ -771,24 +824,68 @@ function renderMXNCGTrend(bu, period) {
           }
         },
         scales: {
-          y: { ticks:{ callback:v=>fmtUSDk(v), font:{size:10}, color:'#94a3b8' }, grid:{ color:'rgba(148,163,184,0.07)' } },
-          x: { grid:{ display:false }, ticks:{ font:{size:12,weight:'600'}, color:'#e2e8f0' } }
+          y: { ticks: { callback: v => fmtUSDk(v), font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
         }
       }
     });
   }
+  renderCumChart('nevSalesChart', salesActCum, salesPlnCum, color);
+  renderCumChart('nevOvChart', ovActCum, ovPlnCum, '#ef4444');
 
-  renderCombo('mxncgSalesChart', data.Sales.actual, data.Sales.plan, '#3b82f6');
-  renderCombo('mxncgOvChart',    data.OV.actual,    data.OV.plan,    '#ef4444');
-  renderSummary('mxncgSalesSummary', 'Sales Trend', data.Sales.actual, data.Sales.plan, '#3b82f6');
-  renderSummary('mxncgOvSummary',    'OV Trend',    data.OV.actual,    data.OV.plan,    '#ef4444');
+  // Monthly detail table
+  const thead = document.getElementById('nevTableHead');
+  const tbody = document.getElementById('nevTableBody');
+  thead.innerHTML = `
+    <tr>
+      <th rowspan="2">지표</th>
+      <th colspan="3">1월</th>
+      <th colspan="3">2월</th>
+      <th colspan="3">3월</th>
+      <th colspan="3">Q1 누적</th>
+    </tr>
+    <tr>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+    </tr>`;
+
+  const nevRows = [
+    { name: 'Sales', m: data.Sales, cost: false, color: color },
+    { name: 'GP',    m: data.GP,    cost: false, color: '#22c55e' },
+    { name: 'CM',    m: data.CM,    cost: false, color: '#a78bfa' },
+    { name: 'OV',    m: data.OV,    cost: false, color: '#ef4444' },
+  ];
+  tbody.innerHTML = '';
+  nevRows.forEach(row => {
+    const qtdAct = sumQ1(row.m.actual), qtdPln = sumQ1(row.m.plan);
+    const avpQ1  = qtdPln !== 0 ? (qtdAct / qtdPln * 100) : null;
+    const tr = document.createElement('tr');
+    let html = `<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${row.color};margin-right:6px;"></span>${row.name}</td>`;
+    for (let i = 0; i < 3; i++) {
+      const a = row.m.actual[i], p = row.m.plan[i];
+      const avp = p !== 0 ? (a / p * 100) : null;
+      const cls = avp != null ? (avp >= 100 ? 'avp-pos' : 'avp-neg') : '';
+      html += `<td class="${a < 0 ? 'neg' : ''}">${fmtUSD(a)}</td>`;
+      html += `<td class="plan-val">${fmtUSD(p)}</td>`;
+      html += `<td class="${cls}">${avp != null ? avp.toFixed(1) + '%' : '—'}</td>`;
+    }
+    const cls = avpQ1 != null ? (avpQ1 >= 100 ? 'avp-pos' : 'avp-neg') : '';
+    html += `<td class="${qtdAct < 0 ? 'neg' : ''}">${fmtUSD(qtdAct)}</td>`;
+    html += `<td class="plan-val">${fmtUSD(qtdPln)}</td>`;
+    html += `<td class="${cls}">${avpQ1 != null ? avpQ1.toFixed(1) + '%' : '—'}</td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
 }
 
+// ============ Master Render ============
 function renderAll() {
   renderBanner(currentBu);
   renderKPIs(currentBu, currentPeriod);
   renderTrends(currentBu, currentPeriod);
-  renderMXNCGTrend(currentBu, currentPeriod);
+  renderNEVSection(currentBu);
   renderSubChannels(currentBu);
   renderDetailTable(currentBu);
 }
@@ -816,3 +913,207 @@ renderAll();
 
 </body>
 </html>
+
+function renderDetailTable(bu) {
+  const body = document.getElementById('detailTableBody');
+  body.innerHTML = '';
+  const data = buMetricsData[bu];
+  const metrics = [
+    { name: 'Sales', m: data.Sales, color: '#3b82f6' },
+    { name: 'GP', m: data.GP, color: '#22c55e' },
+    { name: 'CM', m: data.CM, color: '#a78bfa' },
+    { name: 'Fixed Exp.', m: data.Fixed, color: '#f59e0b', cost: true },
+    { name: 'OV', m: data.OV, color: '#ef4444' }
+  ];
+  metrics.forEach(met => {
+    const ay = sumQ1(met.m.actual), py = sumQ1(met.m.plan);
+    const avp = py !== 0 ? (ay / py * 100) : 0;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${met.color};margin-right:8px;"></span>${met.name}</td>
+      <td class="${met.m.actual[0]<0?'neg':''}">${fmtUSD(met.m.actual[0])}</td>
+      <td style="color:var(--text-dim)">${fmtUSD(met.m.plan[0])}</td>
+      <td class="${met.m.actual[1]<0?'neg':''}">${fmtUSD(met.m.actual[1])}</td>
+      <td style="color:var(--text-dim)">${fmtUSD(met.m.plan[1])}</td>
+      <td class="${met.m.actual[2]<0?'neg':''}">${fmtUSD(met.m.actual[2])}</td>
+      <td style="color:var(--text-dim)">${fmtUSD(met.m.plan[2])}</td>
+      <td class="${ay<0?'neg':''}">${fmtUSD(ay)}</td>
+      <td style="color:var(--text-dim)">${fmtUSD(py)}</td>
+      <td class="${(met.cost ? avp <= 100 : avp >= 100) ? 'pos' : 'neg'}">${avp.toFixed(1)}%</td>
+    `;
+    body.appendChild(tr);
+  });
+}
+
+// ============ NEV 누적 추이 ============
+function renderNEVSection(bu) {
+  const data = buMetricsData[bu];
+  const color = buMeta[bu].color;
+
+  function cumulative(arr) { let s = 0; return arr.map(v => { s += v; return s; }); }
+  const salesActCum = cumulative(data.Sales.actual);
+  const salesPlnCum = cumulative(data.Sales.plan);
+  const ovActCum    = cumulative(data.OV.actual);
+  const ovPlnCum    = cumulative(data.OV.plan);
+  const cumLabels   = ['1월 누적', '2월 누적', '3월 누적'];
+
+  // KPI Row
+  const nevKpiRow = document.getElementById('nevKpiRow');
+  nevKpiRow.innerHTML = '';
+  const q1SalesAct = salesActCum[2], q1SalesPln = salesPlnCum[2];
+  const q1OvAct    = ovActCum[2],   q1OvPln    = ovPlnCum[2];
+  const salesAvp   = q1SalesPln !== 0 ? (q1SalesAct / q1SalesPln * 100) : null;
+  const ovAvp      = q1OvPln    !== 0 ? (q1OvAct    / q1OvPln    * 100) : null;
+
+  [
+    { label: 'Q1 Sales 실적 (E)', val: fmtUSD(q1SalesAct), sub: `계획 ${fmtUSD(q1SalesPln)}`, avp: salesAvp },
+    { label: 'Q1 Sales AvP',      val: salesAvp != null ? salesAvp.toFixed(1)+'%' : '—', sub: salesAvp != null ? (salesAvp >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: salesAvp },
+    { label: 'Q1 OV 실적 (E)',    val: fmtUSD(q1OvAct),   sub: `계획 ${fmtUSD(q1OvPln)}`,   avp: ovAvp },
+    { label: 'Q1 OV AvP',         val: ovAvp   != null ? ovAvp.toFixed(1)+'%'   : '—', sub: ovAvp   != null ? (ovAvp   >= 100 ? '✅ 계획 달성' : '⚠ 계획 미달') : '', avp: ovAvp },
+  ].forEach(item => {
+    const isPos = item.avp != null ? (item.avp >= 100) : true;
+    const d = document.createElement('div');
+    d.className = 'nev-kpi';
+    d.innerHTML = `
+      <div class="nk-label">${item.label}</div>
+      <div class="nk-val" style="color:${item.avp != null ? (isPos ? 'var(--green)' : 'var(--red)') : 'var(--text)'}">${item.val}</div>
+      <div class="nk-sub">${item.sub}</div>`;
+    nevKpiRow.appendChild(d);
+  });
+
+  // Cumulative charts
+  function renderCumChart(canvasId, actCum, plnCum, col) {
+    if (charts[canvasId]) charts[canvasId].destroy();
+    const ctx = document.getElementById(canvasId).getContext('2d');
+    charts[canvasId] = new Chart(ctx, {
+      type: 'bar',
+      data: {
+        labels: cumLabels,
+        datasets: [
+          { label: 'P (계획)', data: plnCum, backgroundColor: 'rgba(148,163,184,0.5)', borderColor: '#94a3b8', borderWidth: 1, borderRadius: 4 },
+          { label: 'E (실적)', data: actCum, backgroundColor: col + 'CC', borderColor: col, borderWidth: 1, borderRadius: 4 }
+        ]
+      },
+      options: {
+        responsive: true, maintainAspectRatio: false,
+        plugins: {
+          legend: { position: 'top', labels: { boxWidth: 10, font: { size: 11 }, padding: 6 } },
+          tooltip: {
+            callbacks: {
+              label: c => c.dataset.label + ': ' + fmtUSD(c.parsed.y),
+              afterBody: (items) => {
+                if (items.length === 2) {
+                  const e = items.find(i => i.dataset.label === 'E (실적)');
+                  const p = items.find(i => i.dataset.label === 'P (계획)');
+                  if (e && p && p.parsed.y !== 0) {
+                    const avp = (e.parsed.y / p.parsed.y * 100).toFixed(1);
+                    const diff = e.parsed.y - p.parsed.y;
+                    return ['AvP: ' + avp + '%', '차이: ' + (diff >= 0 ? '+' : '') + fmtUSD(diff)];
+                  }
+                }
+                return [];
+              }
+            }
+          }
+        },
+        scales: {
+          y: { ticks: { callback: v => fmtUSDk(v), font: { size: 10 } }, grid: { color: 'rgba(148,163,184,0.1)' } },
+          x: { grid: { display: false }, ticks: { font: { size: 11 } } }
+        }
+      }
+    });
+  }
+  renderCumChart('nevSalesChart', salesActCum, salesPlnCum, color);
+  renderCumChart('nevOvChart', ovActCum, ovPlnCum, '#ef4444');
+
+  // Monthly + cumulative table
+  const thead = document.getElementById('nevTableHead');
+  const tbody = document.getElementById('nevTableBody');
+  thead.innerHTML = `
+    <tr>
+      <th rowspan="2">지표</th>
+      <th colspan="3">1월</th>
+      <th colspan="3">2월</th>
+      <th colspan="3">3월</th>
+      <th colspan="3">Q1 누적</th>
+    </tr>
+    <tr>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+      <th>E (실적)</th><th class="plan-val">P (계획)</th><th>AvP</th>
+    </tr>`;
+  tbody.innerHTML = '';
+  [
+    { name: 'Sales', m: data.Sales, color: color },
+    { name: 'GP',    m: data.GP,    color: '#22c55e' },
+    { name: 'CM',    m: data.CM,    color: '#a78bfa' },
+    { name: 'OV',    m: data.OV,    color: '#ef4444' },
+  ].forEach(row => {
+    const qtdAct = sumQ1(row.m.actual), qtdPln = sumQ1(row.m.plan);
+    const avpQ1  = qtdPln !== 0 ? (qtdAct / qtdPln * 100) : null;
+    const tr = document.createElement('tr');
+    let html = `<td><span style="display:inline-block;width:8px;height:8px;border-radius:50%;background:${row.color};margin-right:6px;"></span>${row.name}</td>`;
+    for (let i = 0; i < 3; i++) {
+      const a = row.m.actual[i], p = row.m.plan[i];
+      const avp = p !== 0 ? (a / p * 100) : null;
+      const cls = avp != null ? (avp >= 100 ? 'avp-pos' : 'avp-neg') : '';
+      html += `<td class="${a < 0 ? 'neg' : ''}">${fmtUSD(a)}</td><td class="plan-val">${fmtUSD(p)}</td><td class="${cls}">${avp != null ? avp.toFixed(1)+'%' : '—'}</td>`;
+    }
+    const cls = avpQ1 != null ? (avpQ1 >= 100 ? 'avp-pos' : 'avp-neg') : '';
+    html += `<td class="${qtdAct < 0 ? 'neg' : ''}">${fmtUSD(qtdAct)}</td><td class="plan-val">${fmtUSD(qtdPln)}</td><td class="${cls}">${avpQ1 != null ? avpQ1.toFixed(1)+'%' : '—'}</td>`;
+    tr.innerHTML = html;
+    tbody.appendChild(tr);
+  });
+}
+
+// ============ Master Render ============
+function renderAll() {
+  renderBanner(currentBu);
+  renderKPIs(currentBu, currentPeriod);
+  renderTrends(currentBu, currentPeriod);
+  renderNEVSection(currentBu);
+  renderSubChannels(currentBu);
+  renderDetailTable(currentBu);
+}
+
+// ============ Listeners ============
+document.querySelectorAll('.tab').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.tab').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentBu = t.dataset.bu;
+    renderAll();
+  });
+});
+document.querySelectorAll('.chip').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentPeriod = t.dataset.period;
+    renderAll();
+  });
+});
+
+renderAll();
+</script>
+
+</body>
+</html>
+u;
+    renderAll();
+  });
+});
+document.querySelectorAll('.chip').forEach(t => {
+  t.addEventListener('click', () => {
+    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
+    t.classList.add('active');
+    currentPeriod = t.dataset.period;
+    renderAll();
+  });
+});
+
+renderAll();
+</script>
+
+</bod
