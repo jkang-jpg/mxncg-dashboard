@@ -909,10 +909,6 @@ document.querySelectorAll('.chip').forEach(t => {
 });
 
 renderAll();
-</script>
-
-</body>
-</html>
 
 function renderDetailTable(bu) {
   const body = document.getElementById('detailTableBody');
@@ -1100,20 +1096,3 @@ renderAll();
 
 </body>
 </html>
-u;
-    renderAll();
-  });
-});
-document.querySelectorAll('.chip').forEach(t => {
-  t.addEventListener('click', () => {
-    document.querySelectorAll('.chip').forEach(x => x.classList.remove('active'));
-    t.classList.add('active');
-    currentPeriod = t.dataset.period;
-    renderAll();
-  });
-});
-
-renderAll();
-</script>
-
-</bod
